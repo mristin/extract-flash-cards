@@ -22,6 +22,7 @@ class Step(enum.Enum):
     PYLINT = "pylint"
     TEST = "test"
     DOCTEST = "doctest"
+    CHECK_HELP_IN_README = "check-help-in-readme"
 
 
 def call_and_report(
@@ -191,6 +192,50 @@ def main() -> int:
                     return 1
     else:
         print("Skipped doctest'ing.")
+
+    if sys.version_info >= (3, 9):
+        if (
+            Step.CHECK_HELP_IN_README in selects
+            and Step.CHECK_HELP_IN_README not in skips
+        ):
+            cmd = [sys.executable, "continuous_integration/check_help_in_readme.py"]
+            if overwrite:
+                cmd.append("--overwrite")
+
+            if not overwrite:
+                print("Checking that --help's and the readme coincide...")
+                exit_code = call_and_report(
+                    verb="check that --help's and the readme coincide",
+                    cmd=[
+                        sys.executable,
+                        "continuous_integration/check_help_in_readme.py",
+                    ],
+                    cwd=repo_root,
+                )
+                if exit_code != 0:
+                    return 1
+            else:
+                print("Overwriting the --help's in the readme...")
+                exit_code = call_and_report(
+                    verb="overwrite the --help's in the readme",
+                    cmd=[
+                        sys.executable,
+                        "continuous_integration/check_help_in_readme.py",
+                        "--overwrite",
+                    ],
+                    cwd=repo_root,
+                )
+                if exit_code != 0:
+                    return 1
+
+            subprocess.check_call(cmd, cwd=str(repo_root))
+        else:
+            print("Skipped checking that --help's and the doc coincide.")
+    else:
+        print(
+            "Skipped checking that --help's and the doc coincide "
+            "since we pin it on Python version >= 3.9."
+        )
 
     return 0
 

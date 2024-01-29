@@ -38,6 +38,8 @@ setup(
     install_requires=[
         "icontract>=2.6.1",
         "openai==0.27.7",
+        "anki==23.12.1",
+        "gTTS==2.5.0",
     ],
     extras_require={
         "dev": [
@@ -54,6 +56,7 @@ setup(
     entry_points={
         "console_scripts": [
             "extract-flash-cards=extractflashcards.main:entry_point",
+            "csv-to-anki=extractflashcards.csv_to_anki:entry_point",
         ]
     },
 )

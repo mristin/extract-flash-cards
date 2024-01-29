@@ -6,11 +6,12 @@ considered a phrase or a sentence in itself.
 """
 
 import argparse
+import contextlib
 import csv
 import io
 import pathlib
 import sys
-from typing import List, Tuple, Optional, Set
+from typing import List, Tuple, Optional, Set, TextIO
 
 import openai
 from icontract import require, ensure
@@ -102,6 +103,10 @@ def main(prog: str) -> int:
         help="Path to the text file containing the OpenAI key",
         default="openai-key.txt",
     )
+    parser.add_argument(
+        "--output_path",
+        help="Path where to store the CSV. If not specified, output to STDOUT",
+    )
 
     args = parser.parse_args()
 
@@ -110,6 +115,9 @@ def main(prog: str) -> int:
     text = args.text if args.text is not None else None
     text_path = pathlib.Path(args.text_path) if args.text_path is not None else None
     openai_key_path = pathlib.Path(args.openai_key_path)
+    output_path = (
+        pathlib.Path(args.output_path) if args.output_path is not None else None
+    )
 
     if text is not None and text_path is not None:
         print(
@@ -159,22 +167,38 @@ def main(prog: str) -> int:
 
     assert batches is not None
 
-    writer = csv.writer(sys.stdout)
-    writer.writerow(
-        [
-            source_language,
-            target_language,
-            f"Phrase in {source_language}",
-            f"Phrase in {target_language}",
-        ]
-    )
+    with contextlib.ExitStack() as exit_stack:
+        fid = None  # type: Optional[TextIO]
 
-    observed_set = set()  # type: Set[str]
+        if output_path is None:
+            writer = csv.writer(sys.stdout)
+        else:
+            output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    for batch in batches:
-        for prompt in [
-            (
-                f"""\
+            fid = output_path.open(  # pylint: disable=consider-using-with
+                "wt", encoding="utf-8"
+            )
+            exit_stack.push(fid)
+
+            writer = csv.writer(fid)
+
+        writer.writerow(
+            [
+                source_language,
+                target_language,
+                f"Phrase in {source_language}",
+                f"Phrase in {target_language}",
+            ]
+        )
+        if fid is not None:
+            fid.flush()
+
+        observed_set = set()  # type: Set[str]
+
+        for batch in batches:
+            for prompt in [
+                (
+                    f"""\
 Please extract from the following text lines in {source_language} all the verbs.
 Write them in a four column CSV:
 one column for the {source_language} verbs in infinitive present tense,
@@ -193,9 +217,9 @@ Output only valid CSV, no text before or after!
 
 Here are the text lines:
 {batch}"""
-            ),
-            (
-                f"""\
+                ),
+                (
+                    f"""\
 Please extract from the following text lines in {source_language} all the nouns.
 Write them in a four column CSV:
 one column for the {source_language} noun in nominative singular (not plural!),
@@ -215,10 +239,10 @@ Output only valid CSV, no text before or after!
 
 Here are the text lines:
 {batch}"""
-            ),
-            # pylint: disable=line-too-long
-            (
-                f"""\
+                ),
+                # pylint: disable=line-too-long
+                (
+                    f"""\
 Please extract from the following text lines in {source_language} all the adjectives in {source_language}.
 Do not output any adverbs, only adjectives!
 
@@ -244,9 +268,9 @@ Output only valid CSV, no text before or after!
 
 Here are the text lines:
 {batch}"""
-            ),
-            (
-                f"""\
+                ),
+                (
+                    f"""\
 Please extract from the following text lines in {source_language} all the adverbs in {source_language}.
 Write them in a four column CSV:
 one column for the {source_language} adverb,
@@ -266,32 +290,34 @@ Output only valid CSV, no text before or after!
 
 Here are the text lines:
 {batch}"""
-            ),
-            # pylint: enable=line-too-long
-        ]:
-            try:
-                completion = openai.ChatCompletion.create(  # type: ignore
-                    model=model, messages=[{"role": "user", "content": prompt}]
-                )
-            except openai.error.AuthenticationError as exception:
-                print(
-                    f"Failed to authenticate with OpenAI: {exception}", file=sys.stderr
-                )
-                return 1
+                ),
+                # pylint: enable=line-too-long
+            ]:
+                try:
+                    completion = openai.ChatCompletion.create(  # type: ignore
+                        model=model, messages=[{"role": "user", "content": prompt}]
+                    )
+                except openai.error.AuthenticationError as exception:
+                    print(
+                        f"Failed to authenticate with OpenAI: {exception}",
+                        file=sys.stderr,
+                    )
+                    return 1
 
-            answer = completion.choices[0].message.content
-            reader = csv.reader(io.StringIO(answer))
-            for row in reader:
-                word = row[0]
+                answer = completion.choices[0].message.content
+                reader = csv.reader(io.StringIO(answer))
+                for row in reader:
+                    word = row[0]
 
-                if word in observed_set:
-                    continue
+                    if word in observed_set:
+                        continue
 
-                observed_set.add(word)
+                    observed_set.add(word)
 
-                writer.writerow(row)
+                    writer.writerow(row)
 
-    print()
+                if fid is not None:
+                    fid.flush()
     return 0
 
 
