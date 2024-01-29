@@ -26,12 +26,10 @@ setup(
     author="Marko Ristin",
     author_email="marko@ristin.ch",
     classifiers=[
-        # yapf: disable
-        'Development Status :: 5 - Production/Stable',
-        'Intended Audience :: Education',
-        'License :: OSI Approved :: MIT License',
-        'Programming Language :: Python :: 3.8'
-        # yapf: enable
+        "Development Status :: 5 - Production/Stable",
+        "Intended Audience :: Education",
+        "License :: OSI Approved :: MIT License",
+        "Programming Language :: Python :: 3.10",
     ],
     license="License :: OSI Approved :: MIT License",
     keywords="chatgpt extract vocabulary flash cards",
