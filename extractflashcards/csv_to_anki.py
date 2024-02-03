@@ -138,7 +138,7 @@ def main(prog: str) -> int:
                 if synthesize_audio is not None:
                     tts = gtts.gTTS(text=source, lang=synthesize_audio)
 
-                    mp3_pth = tmp_dir / f"{i}.mp3"
+                    mp3_pth = tmp_dir / f"{uid4}-{i}.mp3"
                     tts.save(str(mp3_pth))
                     collection.media.add_file(str(mp3_pth))
                     note["tts"] = f"[sound:{mp3_pth.name}]"
